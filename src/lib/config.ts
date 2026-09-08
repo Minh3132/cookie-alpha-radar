@@ -1,0 +1,9 @@
+export const COOKIE_RPC = import.meta.env.VITE_COOKIE_RPC || 'https://rpc.cookiescan.io'
+export const COOKIE_WS = import.meta.env.VITE_COOKIE_WS || 'wss://api.cookiescan.io/stream'
+export const COOKIE_API = import.meta.env.VITE_COOKIE_API || 'https://api.cookiescan.io'
+export const COOKIE_EXPLORER = 'https://cookiescan.io'
+export const COOKIE_SWAP = 'https://cookieswap.fun'
+export const COOKIE_BRIDGE = 'https://bridge.cookiescan.io'
+export const COOK_MINT = 'So11111111111111111111111111111111111111112'
+export const COOK_DECIMALS = 9
+export const MEMO_PROGRAM = 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr'
