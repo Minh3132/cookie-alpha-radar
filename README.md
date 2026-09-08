@@ -19,7 +19,7 @@ The app does **not** fabricate market values when an upstream feed is unavailabl
 - ✅ Cookie Chain SVM / official RPC (`https://rpc.cookiescan.io`)
 - ✅ Nightly / Wallet Standard wallet connectivity
 - ✅ Connected wallet visible via the wallet adapter UI
-- ✅ Real Cookie Chain transaction execution
+- ✅ Real Cookie Chain transaction execution capability
 - ✅ Confirmation handling and transaction errors surfaced to the user
 - ✅ Application-specific live market data and scoring dashboard
 - ✅ CookieScan token links
@@ -55,7 +55,7 @@ Memo shape:
 cookie-alpha-radar:v1|watch=<TOKEN_MINT>|symbol=<SYMBOL>|score=<0-100>
 ```
 
-After confirmation, the signature is added to the local Activity panel and links to CookieScan.
+When a user chooses to broadcast and the transaction confirms, the signature is added to the local Activity panel and links to CookieScan.
 
 This is intentionally low-risk: the transaction proves meaningful app interaction without asking the user to hand a private key to the website or forcing a token swap.
 
@@ -134,7 +134,7 @@ For Vercel:
 
 ## Evidence journal
 
-Every confirmed/failed Watch Proof and Smart Swap attempt is recorded locally in the browser. The journal can export JSON or CSV for the bounty submission packet. It stores transaction evidence and human-readable errors only — never wallet secrets.
+Every user-initiated Watch Proof and Smart Swap attempt can be recorded locally in the browser, including success/failure states when execution occurs. The journal can export JSON or CSV for the bounty submission packet. It stores transaction evidence and human-readable errors only — never wallet secrets.
 
 ## Security notes
 
@@ -167,3 +167,8 @@ Every confirmed/failed Watch Proof and Smart Swap attempt is recorded locally in
 ---
 
 Built for the Superteam **Create an App on Cookie Chain** bounty.
+
+
+## Submission disclosure
+
+The app contains real transaction execution paths, but the project submission does not claim that the author personally broadcast a mainnet transaction unless a real signature is explicitly provided. The demo may stop before broadcast.
