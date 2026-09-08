@@ -20,6 +20,7 @@ The application implements real Cookie Chain transaction execution paths, confir
 ## Required links
 - Live app: https://cookie-alpha-radar-chukhacminh24369-6507.vercel.app
 - GitHub: https://github.com/Minh3132/cookie-alpha-radar
+- X demo thread: https://x.com/RiznawatiMufli/status/2097156751070257419?s=20
 - Program used by optional Watch Proof flow: `MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr`
 
 ## Demo sequence — no broadcast required
@@ -34,15 +35,9 @@ The application implements real Cookie Chain transaction execution paths, confir
 9. Show the transaction status/error UI and Activity Journal without broadcasting a transaction.
 10. Show the current Hyperlane bridge guide for users who need COOK.
 
-## X thread draft outline
-1. Hook: “Dashboards tell you what happened. Cookie Alpha Radar turns Cookie Chain market activity into an explainable action board.”
-2. Show the live market radar.
-3. Explain transparent Alpha and Risk scores.
-4. Show Nightly connection and Cookie Chain network setup.
-5. Show dual-router Cookiebox + Candy Shop quote comparison and the pre-sign safety checks.
-6. Explain that transaction building, wallet signing, simulation, broadcast and confirmation are implemented non-custodially; the demo does not claim a personal mainnet broadcast.
-7. Bridge guide: direct users to https://hyperlane.cookiescan.io when they need COOK.
-8. Add live app + repo links.
+## X thread
+Published demo thread:
+https://x.com/RiznawatiMufli/status/2097156751070257419?s=20
 
 ## Smart Router
 The app compares two Cookie Chain aggregation paths used by the ecosystem:
