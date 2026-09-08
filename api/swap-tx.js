@@ -1,10 +1,10 @@
 const COOKIEBOX = 'https://agg.cookiebox.app'
 const COOKIESCAN_SWAP = 'https://swap.cookiescan.io/api'
 
-async function postJson(url, body, timeoutMs = 60000) {
+async function readJson(url, init, timeoutMs = 60000) {
   const controller = new AbortController(); const id = setTimeout(() => controller.abort(), timeoutMs)
   try {
-    const r = await fetch(url, { method:'POST', signal:controller.signal, headers:{'content-type':'application/json'}, body:JSON.stringify(body) })
+    const r = await fetch(url, { ...init, signal:controller.signal, headers:{'content-type':'application/json', ...(init?.headers || {})} })
     const text = await r.text()
     if (!r.ok) throw new Error(`${r.status}: ${text.slice(0,200)}`)
     return JSON.parse(text)
@@ -15,15 +15,26 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store')
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
   try {
-    const { aggregator, inputMint, outputMint, amount, slippageBps = 500, owner, rawRoute } = req.body || {}
+    const { aggregator, inputMint, outputMint, amount, slippageBps = 500, owner } = req.body || {}
     if (!owner || !inputMint || !outputMint || !amount) throw new Error('missing swap fields')
+    if (!/^\d+$/.test(String(amount)) || BigInt(String(amount)) <= 0n) throw new Error('amount must be a positive raw integer')
+    const slip = Number(slippageBps)
+    if (!Number.isInteger(slip) || slip < 10 || slip > 3000) throw new Error('slippageBps must be between 10 and 3000')
+
     if (aggregator === 'cookiebox') {
-      const built = await postJson(`${COOKIEBOX}/swap-tx`, { inputMint, outputMint, amount:String(amount), slippageBps:Number(slippageBps), owner })
+      // Cookiebox re-quotes server-side as part of /swap-tx.
+      const built = await readJson(`${COOKIEBOX}/swap-tx`, {method:'POST',body:JSON.stringify({ inputMint, outputMint, amount:String(amount), slippageBps:slip, owner })})
+      if (!built?.transactionBase64) throw new Error('Cookiebox returned no transaction')
       return res.status(200).json({ aggregator, transactionBase64: built.transactionBase64, blockhash: built.blockhash, lastValidBlockHeight: built.lastValidBlockHeight })
     }
+
     if (aggregator === 'cookiescan') {
-      if (!rawRoute) throw new Error('missing Candy Shop route')
-      const built = await postJson(`${COOKIESCAN_SWAP}/swap-tx/multi-route`, { multiRoute: rawRoute, userPublicKey: owner }, 20000)
+      // Never trust a route echoed by the browser. Re-quote on the server immediately before build.
+      const qs = new URLSearchParams({ inputMint, outputMint, amount:String(amount), slippageBps:String(slip) })
+      const quoted = await readJson(`${COOKIESCAN_SWAP}/quote/multi-route?${qs}`, undefined, 12000)
+      if (!quoted?.multiRoute) throw new Error('Candy Shop returned no fresh route')
+      const built = await readJson(`${COOKIESCAN_SWAP}/swap-tx/multi-route`, {method:'POST',body:JSON.stringify({ multiRoute: quoted.multiRoute, userPublicKey: owner })}, 20000)
+      if (!built?.transactionBase64) throw new Error('Candy Shop returned no transaction')
       return res.status(200).json({ aggregator, transactionBase64: built.transactionBase64 })
     }
     throw new Error('unsupported aggregator')

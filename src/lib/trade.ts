@@ -16,7 +16,6 @@ export async function buildSwapTransaction(args: { quote: SwapQuote; owner: stri
     amount: args.amount,
     slippageBps: args.slippageBps,
     owner: args.owner,
-    rawRoute: args.quote.raw,
   }) })
   const body = await r.json() as { transactionBase64?: string; blockhash?: string; lastValidBlockHeight?: number; error?: string }
   if (!r.ok || !body.transactionBase64) throw new Error(body.error || `swap build ${r.status}`)

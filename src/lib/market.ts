@@ -26,6 +26,11 @@ const getNested = (obj: RawObject, key: string): unknown => {
   return cur
 }
 
+function safeDecimals(value: number | null) {
+  if (value == null || !Number.isInteger(value) || value < 0 || value > 18) return null
+  return value
+}
+
 export function normalizeToken(input: unknown): TokenRecord | null {
   if (!input || typeof input !== 'object') return null
   const o = input as RawObject
@@ -33,7 +38,7 @@ export function normalizeToken(input: unknown): TokenRecord | null {
   if (!mint) return null
   const symbol = str(o.symbol, o.ticker, getNested(o, 'token.symbol')) || `${mint.slice(0, 4)}…${mint.slice(-4)}`
   const name = str(o.name, getNested(o, 'token.name')) || symbol
-  const decimals = num(o.decimals, getNested(o, 'token.decimals'))
+  const decimals = safeDecimals(num(o.decimals, getNested(o, 'token.decimals')))
   const priceUsd = num(o.priceUsd, o.price_usd, o.price, getNested(o, 'market.priceUsd'))
   const volume24h = num(o.volume24h, o.volume_24h, o.volume24H, getNested(o, 'market.volume24h'))
   const marketCap = num(o.marketCap, o.market_cap, o.mcap, getNested(o, 'market.marketCap'))
@@ -43,7 +48,7 @@ export function normalizeToken(input: unknown): TokenRecord | null {
   return { mint, symbol, name, decimals, priceUsd, volume24h, marketCap, liquidity, change24h, ...scored, source: 'live' }
 }
 
-function scoreToken(v: Pick<TokenRecord, 'volume24h' | 'marketCap' | 'liquidity' | 'change24h'>) {
+export function scoreToken(v: Pick<TokenRecord, 'volume24h' | 'marketCap' | 'liquidity' | 'change24h'>) {
   let score = 35
   const reasons: string[] = []
   const liq = v.liquidity ?? 0
@@ -70,9 +75,48 @@ function scoreToken(v: Pick<TokenRecord, 'volume24h' | 'marketCap' | 'liquidity'
   else if (change >= 35) { score -= 5; reasons.push('elevated volatility') }
 
   score = Math.max(0, Math.min(100, Math.round(score)))
-  const risk: TokenRecord['risk'] = score >= 68 ? 'LOW' : score >= 48 ? 'MEDIUM' : 'HIGH'
+
+  // Risk is deliberately separate from alpha. High momentum does not imply safety.
+  let riskPoints = 0
+  if (liq <= 0) riskPoints += 3
+  else if (liq < 5_000) riskPoints += 3
+  else if (liq < 25_000) riskPoints += 1
+  if (mcap > 0 && liq > 0 && liq / mcap < 0.02) riskPoints += 2
+  if (change >= 80) riskPoints += 2
+  else if (change >= 35) riskPoints += 1
+  if (vol <= 0) riskPoints += 1
+  const risk: TokenRecord['risk'] = riskPoints >= 4 ? 'HIGH' : riskPoints >= 2 ? 'MEDIUM' : 'LOW'
+
   if (!reasons.length) reasons.push('limited market data')
   return { score, risk, reasons }
+}
+
+export function applyPriceTick(tokens: TokenRecord[], payload: unknown): TokenRecord[] {
+  if (!payload || typeof payload !== 'object') return tokens
+  const root = payload as RawObject
+  const rows = Array.isArray(root.tokens) ? root.tokens : []
+  if (!rows.length) return tokens
+  const updates = new Map<string, { priceUsd: number | null; volume24h: number | null }>()
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue
+    const o = row as RawObject
+    const mint = str(o.mint, o.address)
+    if (!mint) continue
+    updates.set(mint, { priceUsd: num(o.priceUsd, o.price), volume24h: num(o.volume24h, o.volume_24h) })
+  }
+  if (!updates.size) return tokens
+  return tokens
+    .map((token) => {
+      const u = updates.get(token.mint)
+      if (!u) return token
+      const next = {
+        ...token,
+        priceUsd: u.priceUsd ?? token.priceUsd,
+        volume24h: u.volume24h ?? token.volume24h,
+      }
+      return { ...next, ...scoreToken(next) }
+    })
+    .sort((a, b) => b.score - a.score)
 }
 
 export function extractTokenArray(payload: unknown): unknown[] {

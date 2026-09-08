@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useConnection, useWallet } from '@solana/wallet-adapter-react'
 import { VersionedTransaction } from '@solana/web3.js'
 import { COOK_DECIMALS, COOK_MINT, COOKIE_EXPLORER } from '../lib/config'
+import { decimalToRaw } from '../lib/amount'
 import { buildSwapTransaction, getSwapQuotes } from '../lib/trade'
 import type { SwapQuote, TokenRecord } from '../lib/types'
 
@@ -26,12 +27,10 @@ export function TradeModal({ token, onClose }: { token: TokenRecord; onClose: ()
   const [state, setState] = useState<'idle'|'quoting'|'building'|'signing'|'simulating'|'sending'|'confirmed'|'error'>('idle')
   const [message, setMessage] = useState('')
   const [signature, setSignature] = useState('')
+  const [riskAccepted, setRiskAccepted] = useState(false)
   const { connection } = useConnection()
   const { publicKey, signTransaction } = useWallet()
-  const rawAmount = useMemo(() => {
-    const n = Number(amount); if (!Number.isFinite(n) || n <= 0) return ''
-    return BigInt(Math.round(n * 10 ** COOK_DECIMALS)).toString()
-  }, [amount])
+  const rawAmount = useMemo(() => decimalToRaw(amount, COOK_DECIMALS), [amount])
 
   async function quote() {
     if (!rawAmount) { setMessage('Enter a positive COOK amount.'); setState('error'); return }
@@ -44,6 +43,7 @@ export function TradeModal({ token, onClose }: { token: TokenRecord; onClose: ()
 
   async function execute(q: SwapQuote) {
     if (!publicKey || !signTransaction) { setState('error'); setMessage('Connect a signing wallet first.'); return }
+    if (!rawAmount) { setState('error'); setMessage('Enter a valid COOK amount with at most 9 decimals.'); return }
     try {
       setState('building'); setMessage(`Building ${q.aggregator} transaction…`)
       const built = await buildSwapTransaction({ quote:q, owner:publicKey.toBase58(), amount:rawAmount, slippageBps:slippage })
@@ -67,13 +67,14 @@ export function TradeModal({ token, onClose }: { token: TokenRecord; onClose: ()
       <button className="modal-close" onClick={onClose}>×</button>
       <span className="kicker">SMART ROUTER</span><h2>COOK → {token.symbol}</h2>
       <p className="muted">Compare two Cookie Chain aggregators. The winning transaction is built server-side, signed only inside your wallet, simulated on the official Cookie RPC, then broadcast only if simulation succeeds.</p>
+      {token.risk === 'HIGH' && <label className="risk-consent"><input type="checkbox" checked={riskAccepted} onChange={e=>setRiskAccepted(e.target.checked)} /><span><b>High-risk market signal.</b> I understand thin liquidity / volatility can cause severe slippage or loss.</span></label>}
       <div className="trade-inputs"><label>Spend COOK<input value={amount} onChange={e=>setAmount(e.target.value)} inputMode="decimal" /></label><label>Slippage<select value={slippage} onChange={e=>setSlippage(Number(e.target.value))}><option value={100}>1%</option><option value={300}>3%</option><option value={500}>5%</option><option value={1000}>10%</option></select></label><button onClick={()=>void quote()} disabled={state==='quoting'}>Compare</button></div>
       <div className={`trade-state state-${state}`}>{message || 'Ready.'}</div>
       {errors.length>0 && <div className="route-errors">{errors.map(x=><span key={x}>{x}</span>)}</div>}
       <div className="quotes">{quotes.map((q,i)=><div className="quote-card" key={q.aggregator}>
         <div><b>{i===0?'BEST · ':''}{q.aggregator === 'cookiebox'?'Cookiebox':'Candy Shop'}</b><span>{q.route.join(' → ') || 'aggregated route'}</span></div>
         <div className="quote-output"><small>Expected</small><strong>{fmtRaw(q.outAmount, token.decimals)} {token.symbol}</strong><span>impact {q.priceImpactPct == null?'—':`${q.priceImpactPct.toFixed(2)}%`}</span></div>
-        <button onClick={()=>void execute(q)} disabled={!publicKey || ['building','signing','simulating','sending'].includes(state)}>{publicKey?'Review & swap':'Connect wallet'}</button>
+        <button onClick={()=>void execute(q)} disabled={!publicKey || (token.risk === 'HIGH' && !riskAccepted) || ['building','signing','simulating','sending'].includes(state)}>{publicKey?'Review & swap':'Connect wallet'}</button>
       </div>)}</div>
       {signature && <a className="confirmed-link" href={`${COOKIE_EXPLORER}/tx/${signature}`} target="_blank" rel="noreferrer">Open confirmed transaction ↗</a>}
       <div className="trade-safety"><b>Safety boundary</b><span>No private key enters the app. Signing happens in the wallet. A signed transaction is simulated before send. You can reject the wallet prompt at any time.</span></div>

@@ -18,7 +18,7 @@ export function TokenTable({ tokens, onWatch, onTrade, busyMint }: { tokens: Tok
         <thead><tr><th>Asset</th><th>Alpha</th><th>Price</th><th>24h</th><th>Liquidity</th><th>Volume</th><th>Risk signal</th><th></th></tr></thead>
         <tbody>{tokens.map((token) => (
           <tr key={token.mint}>
-            <td><div className="asset"><b>{token.symbol}</b><span>{token.name}</span><code>{token.mint.slice(0, 5)}…{token.mint.slice(-5)}</code></div></td>
+            <td><div className="asset"><b>{token.symbol}{token.source === 'demo' && <em className="demo-badge">DEMO</em>}</b><span>{token.name}</span><code>{token.mint.slice(0, 5)}…{token.mint.slice(-5)}</code></div></td>
             <td><div className={`score score-${token.risk.toLowerCase()}`}>{token.score}</div></td>
             <td>{money(token.priceUsd)}</td>
             <td className={(token.change24h ?? 0) >= 0 ? 'positive' : 'negative'}>{token.change24h == null ? '—' : `${token.change24h > 0 ? '+' : ''}${token.change24h.toFixed(1)}%`}</td>
@@ -26,9 +26,9 @@ export function TokenTable({ tokens, onWatch, onTrade, busyMint }: { tokens: Tok
             <td>{money(token.volume24h)}</td>
             <td><div className="reasons">{token.reasons.slice(0, 2).map(r => <span key={r}>{r}</span>)}</div></td>
             <td><div className="row-actions">
-              <button className="watch-button" onClick={() => onWatch(token)} disabled={busyMint === token.mint}>{busyMint === token.mint ? 'Signing…' : 'Watch on-chain'}</button>
+              <button className="watch-button" onClick={() => onWatch(token)} disabled={token.source === 'demo' || busyMint === token.mint}>{token.source === 'demo' ? 'Demo only' : busyMint === token.mint ? 'Signing…' : 'Watch on-chain'}</button>
               <a href={`${COOKIE_EXPLORER}/token/${token.mint}`} target="_blank" rel="noreferrer">Scan</a>
-              <button className="trade-button" onClick={() => onTrade(token)}>Smart swap</button><a href={COOKIE_SWAP} target="_blank" rel="noreferrer">DEX</a>
+              <button className="trade-button" onClick={() => onTrade(token)} disabled={token.source === 'demo'}>{token.source === 'demo' ? 'No demo trade' : 'Smart swap'}</button><a href={COOKIE_SWAP} target="_blank" rel="noreferrer">DEX</a>
             </div></td>
           </tr>
         ))}</tbody>

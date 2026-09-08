@@ -50,15 +50,22 @@ function localApi(): Plugin {
           if (url.pathname === '/api/swap-tx' && req.method === 'POST') {
             const chunks:Buffer[]=[]; for await (const chunk of req) chunks.push(Buffer.from(chunk))
             const body=JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')
-            const {aggregator,inputMint,outputMint,amount,slippageBps=500,owner,rawRoute}=body
+            const {aggregator,inputMint,outputMint,amount,slippageBps=500,owner}=body
             if(!owner||!inputMint||!outputMint||!amount) throw new Error('missing swap fields')
+            if(!/^\d+$/.test(String(amount)) || BigInt(String(amount)) <= 0n) throw new Error('amount must be a positive raw integer')
+            const slip=Number(slippageBps)
+            if(!Number.isInteger(slip) || slip < 10 || slip > 3000) throw new Error('slippageBps must be between 10 and 3000')
             if(aggregator==='cookiebox') {
-              const built=await readJson(`${COOKIEBOX}/swap-tx`,{method:'POST',body:JSON.stringify({inputMint,outputMint,amount:String(amount),slippageBps:Number(slippageBps),owner})},60000)
+              const built=await readJson(`${COOKIEBOX}/swap-tx`,{method:'POST',body:JSON.stringify({inputMint,outputMint,amount:String(amount),slippageBps:slip,owner})},60000)
+              if(!built?.transactionBase64) throw new Error('Cookiebox returned no transaction')
               res.statusCode=200; res.end(JSON.stringify({aggregator,transactionBase64:built.transactionBase64,blockhash:built.blockhash,lastValidBlockHeight:built.lastValidBlockHeight})); return
             }
             if(aggregator==='cookiescan') {
-              if(!rawRoute) throw new Error('missing Candy Shop route')
-              const built=await readJson(`${COOKIESCAN_SWAP}/swap-tx/multi-route`,{method:'POST',body:JSON.stringify({multiRoute:rawRoute,userPublicKey:owner})},20000)
+              const qs=new URLSearchParams({inputMint,outputMint,amount:String(amount),slippageBps:String(slip)})
+              const quoted=await readJson(`${COOKIESCAN_SWAP}/quote/multi-route?${qs}`,undefined,12000)
+              if(!quoted?.multiRoute) throw new Error('Candy Shop returned no fresh route')
+              const built=await readJson(`${COOKIESCAN_SWAP}/swap-tx/multi-route`,{method:'POST',body:JSON.stringify({multiRoute:quoted.multiRoute,userPublicKey:owner})},20000)
+              if(!built?.transactionBase64) throw new Error('Candy Shop returned no transaction')
               res.statusCode=200; res.end(JSON.stringify({aggregator,transactionBase64:built.transactionBase64})); return
             }
             throw new Error('unsupported aggregator')

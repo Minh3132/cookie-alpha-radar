@@ -5,9 +5,12 @@ import { Buffer } from 'buffer'
 import { WalletPanel } from './components/WalletPanel'
 import { TokenTable } from './components/TokenTable'
 import { TradeModal } from './components/TradeModal'
+import { PortfolioPanel } from './components/PortfolioPanel'
 import { fetchChainStatus, fetchTokens } from './lib/api'
-import { COOKIE_BRIDGE, COOKIE_EXPLORER, COOKIE_RPC, MEMO_PROGRAM } from './lib/config'
+import { COOKIE_BRIDGE, COOKIE_EXPLORER, COOKIE_RPC, COOKIE_WS, MEMO_PROGRAM } from './lib/config'
 import type { ChainStatus, TokenRecord, WatchProof } from './lib/types'
+import { applyPriceTick } from './lib/market'
+import { DEMO_TOKENS } from './lib/demo'
 
 const initialStatus: ChainStatus = { online: false, cookUsd: null, activeTokens: null, slot: null, latencyMs: null, source: 'unknown' }
 
@@ -20,6 +23,8 @@ export default function App() {
   const [busyMint, setBusyMint] = useState<string | null>(null)
   const [tradeToken, setTradeToken] = useState<TokenRecord | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+  const [streamLive, setStreamLive] = useState(false)
+  const [demoMode, setDemoMode] = useState(false)
   const [proofs, setProofs] = useState<WatchProof[]>(() => {
     try { return JSON.parse(localStorage.getItem('cookie-alpha-proofs') || '[]') as WatchProof[] } catch { return [] }
   })
@@ -31,7 +36,7 @@ export default function App() {
     const controller = new AbortController()
     try {
       const [nextTokens, nextStatus] = await Promise.all([fetchTokens(controller.signal), fetchChainStatus(controller.signal)])
-      setTokens(nextTokens); setStatus(nextStatus)
+      setTokens(nextTokens); setStatus(nextStatus); setDemoMode(false)
     } catch (e) {
       setStatus(await fetchChainStatus())
       setError(e instanceof Error ? e.message : 'CookieScan market feed unavailable')
@@ -40,6 +45,40 @@ export default function App() {
   }, [])
 
   useEffect(() => { void refresh(); const id = window.setInterval(() => void refresh(), 20_000); return () => window.clearInterval(id) }, [refresh])
+
+  useEffect(() => {
+    let socket: WebSocket | null = null
+    let retryId: number | null = null
+    let stopped = false
+
+    const connect = () => {
+      if (stopped) return
+      try {
+        socket = new WebSocket(COOKIE_WS)
+        socket.onopen = () => setStreamLive(true)
+        socket.onmessage = (event) => {
+          try { setTokens((current) => applyPriceTick(current, JSON.parse(String(event.data)))) } catch { /* ignore malformed ticks */ }
+        }
+        socket.onerror = () => setStreamLive(false)
+        socket.onclose = () => {
+          setStreamLive(false)
+          if (!stopped) retryId = window.setTimeout(connect, 5_000)
+        }
+      } catch {
+        setStreamLive(false)
+        retryId = window.setTimeout(connect, 5_000)
+      }
+    }
+    connect()
+    return () => {
+      stopped = true
+      if (retryId != null) window.clearTimeout(retryId)
+      socket?.close()
+    }
+  }, [])
+
+
+  const useDemoFixture = useCallback(() => { setTokens(DEMO_TOKENS); setDemoMode(true); setLoading(false); setToast('DEMO fixture loaded — transactional actions are disabled for synthetic rows.') }, [])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -83,25 +122,27 @@ export default function App() {
       </section>
 
       <section className="metrics">
-        <Metric label="Feed" value={status.online ? 'LIVE' : 'DEGRADED'} sub={status.source} />
+        <Metric label="Feed" value={demoMode ? 'DEMO' : status.online ? 'LIVE' : 'DEGRADED'} sub={demoMode ? 'explicit synthetic fixture' : `${status.source}${streamLive ? ' + 5s stream' : ' + polling'}`} />
         <Metric label="Assets ranked" value={tokens.length || '—'} sub="CookieScan registry" />
-        <Metric label="Low-risk signals" value={tokens.length ? lowRisk : '—'} sub="score ≥ 68" />
+        <Metric label="Low-risk assets" value={tokens.length ? lowRisk : '—'} sub="separate safety model" />
         <Metric label="Median alpha" value={tokens.length ? median : '—'} sub="0–100 model" />
         <Metric label="RPC latency" value={status.latencyMs == null ? '—' : `${status.latencyMs}ms`} sub={COOKIE_RPC.replace('https://','')} />
       </section>
 
       <section className="panel" id="radar">
         <div className="panel-head"><div><span className="kicker">ALPHA BOARD</span><h2>Live market radar</h2></div><div className="filters"><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search symbol / mint"/><button onClick={() => void refresh()}>{loading ? 'Refreshing…' : 'Refresh'}</button></div></div>
-        {error && <div className="warning"><b>Market feed degraded.</b> {error}. No synthetic market values are substituted; retry when CookieScan is healthy.</div>}
+        {error && <div className="warning feed-warning"><div><b>Market feed degraded.</b> {error}. No synthetic values are substituted automatically.</div><button onClick={useDemoFixture}>Load labeled demo fixture</button></div>}
         <TokenTable tokens={top} onWatch={watchOnChain} onTrade={setTradeToken} busyMint={busyMint} />
       </section>
 
+      <PortfolioPanel />
+
       <section className="split">
-        <div className="panel methodology"><span className="kicker">MODEL</span><h2>Explainable, not magic.</h2><p>The score rewards liquidity depth, 24h flow and turnover while penalizing thin liquidity and extreme volatility. Every row shows its strongest reasons so users can disagree with the model.</p><div className="formula"><span>Liquidity</span><b>+</b><span>Flow</span><b>+</b><span>Turnover</span><b>−</b><span>Volatility</span></div></div>
+        <div className="panel methodology"><span className="kicker">MODEL</span><h2>Explainable, not magic.</h2><p>Alpha rewards liquidity depth, 24h flow and turnover. Risk is scored separately from liquidity weakness, concentration proxies, missing flow and extreme volatility — momentum is never labeled safe just because it is strong.</p><div className="formula"><span>Liquidity</span><b>+</b><span>Flow</span><b>+</b><span>Turnover</span><b>−</b><span>Volatility</span></div></div>
         <div className="panel proofs"><span className="kicker">ON-CHAIN ACTIVITY</span><h2>Watch proofs</h2>{proofs.length === 0 ? <p className="muted">Connect a wallet and choose “Watch on-chain”. The app writes a small Memo transaction on Cookie Chain and records the confirmed signature here.</p> : <div className="proof-list">{proofs.map(p => <a key={p.signature} href={`${COOKIE_EXPLORER}/tx/${p.signature}`} target="_blank" rel="noreferrer"><b>{p.symbol}</b><span>score {p.score}</span><code>{p.signature.slice(0,6)}…{p.signature.slice(-6)}</code></a>)}</div>}</div>
       </section>
 
-      <footer><div><b>Cookie Alpha Radar</b><span>Built natively for Cookie Chain.</span></div><div><a href="https://docs.cookiechain.wtf" target="_blank" rel="noreferrer">Docs</a><a href="https://api.cookiescan.io" target="_blank" rel="noreferrer">DAS API</a><a href="https://cookieswap.fun" target="_blank" rel="noreferrer">CookieSwap</a></div></footer>
+      <footer><div><b>Cookie Alpha Radar · v0.3.0</b><span>Built natively for Cookie Chain.</span></div><div><a href="https://docs.cookiechain.wtf" target="_blank" rel="noreferrer">Docs</a><a href="https://api.cookiescan.io" target="_blank" rel="noreferrer">DAS API</a><a href="https://cookieswap.fun" target="_blank" rel="noreferrer">CookieSwap</a></div></footer>
       {tradeToken && <TradeModal token={tradeToken} onClose={() => setTradeToken(null)} />}
       {toast && <button className="toast" onClick={() => setToast(null)}>{toast}<span>×</span></button>}
     </main>

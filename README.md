@@ -35,7 +35,9 @@ The app includes a serverless quote/build proxy for the same two Cookie Chain ag
 - Cookiebox aggregator: `https://agg.cookiebox.app`
 - Candy Shop / CookieScan swap API: `https://swap.cookiescan.io/api`
 
-Flow: **quote both → rank net output → build unsigned transaction → wallet signs locally → simulate on Cookie Chain RPC → broadcast only after a clean simulation → confirm**.
+Flow: **quote both → rank net output → server-side re-quote selected route → build unsigned transaction → wallet signs locally → simulate on Cookie Chain RPC → broadcast only after a clean simulation → confirm**.
+
+For Candy Shop, the build endpoint deliberately ignores any route echoed back by the browser and fetches a fresh route server-side before transaction construction.
 
 No private key is sent to the site or serverless functions.
 
@@ -66,7 +68,7 @@ The normalizer is defensive because the registry is evolving. Unknown/missing ma
 
 ## Scoring model
 
-The score is intentionally simple and auditable:
+The **Alpha score** is intentionally simple and auditable:
 
 - liquidity depth: positive
 - 24h trading flow: positive
@@ -74,11 +76,7 @@ The score is intentionally simple and auditable:
 - volume / market-cap turnover: positive
 - extreme 24h price volatility: negative
 
-Risk band is a *market-structure signal*, not an audit or investment recommendation:
-
-- `LOW`: score >= 68
-- `MEDIUM`: score 48–67
-- `HIGH`: score < 48
+**Risk is calculated separately from Alpha.** It penalizes thin/missing liquidity, weak liquidity-to-cap structure, missing flow and extreme volatility. This prevents a fast-moving token from being labeled “low risk” merely because it has strong momentum. The band is still only a market-structure signal — not a smart-contract audit or investment recommendation.
 
 ## Nightly network setup
 
@@ -125,7 +123,7 @@ No private keys or server secrets are needed.
 
 ## Deploy
 
-This is a static Vite app. Vercel, Netlify, Cloudflare Pages, GitHub Pages, or any static host can deploy `dist/` after `npm run build`.
+The UI is a Vite app and the dual-router quote/build proxy uses `/api` serverless functions. **Vercel is the recommended deployment target** so the Smart Router works in production without exposing cross-origin aggregator assumptions to the browser.
 
 For Vercel:
 
@@ -143,7 +141,7 @@ For Vercel:
 ## Roadmap before final bounty submission
 
 - [ ] Validate Nightly network-switch + Memo transaction with a funded low-value Cookie Chain wallet.
-- [ ] Add live WebSocket price ticks from `wss://api.cookiescan.io/stream` once the upstream stream is verified in-browser.
+- [x] Add 5-second CookieScan WebSocket price/volume ticks with automatic reconnect; REST polling remains the fallback.
 - [x] Add Cookiebox/Candy Shop quote comparison.
 - [x] Add wallet-signed, pre-broadcast simulated swap execution.
 - [ ] Deploy public build.
