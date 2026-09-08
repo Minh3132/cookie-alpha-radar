@@ -5,7 +5,7 @@ Cookie Alpha Radar is a Cookie Chain-native market intelligence and transaction-
 The execution path is non-custodial: the app performs a server-side fresh re-quote, validates route identity/output deterioration and the v0 transaction fee payer, then supports wallet review/signing, Cookie RPC simulation, broadcast and confirmation handling. The submission demo does not claim that the author personally broadcast a mainnet transaction; no chain signature is presented unless one is genuinely produced by a user.
 
 GitHub: https://github.com/Minh3132/cookie-alpha-radar
-Live app: <PASTE_VERCEL_URL>
+Live app: https://cookie-alpha-radar-chukhacminh24369-6507.vercel.app
 Optional Watch Proof program: MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr
 
 Highlights:
