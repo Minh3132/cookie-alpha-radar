@@ -39,10 +39,10 @@ function localApi(): Plugin {
             ])
             const quotes:any[] = []; const errors:string[] = []
             if (cb.status === 'fulfilled' && cb.value?.route) {
-              const q=cb.value.route; quotes.push({ aggregator:'cookiebox', inputMint, outputMint, inAmount:String(q.inAmount??amount), outAmount:String(q.netOutAmount??q.outAmount??'0'), minOutAmount:q.minOutAmount==null?null:String(q.minOutAmount), priceImpactPct:Number.isFinite(Number(q.priceImpactPct))?Number(q.priceImpactPct):null, route:Array.isArray(q.path)?q.path:[], raw:q })
+              const q=cb.value.route; quotes.push({ aggregator:'cookiebox', inputMint, outputMint, inAmount:String(q.inAmount??amount), outAmount:String(q.netOutAmount??q.outAmount??'0'), minOutAmount:q.minOutAmount==null?null:String(q.minOutAmount), priceImpactPct:Number.isFinite(Number(q.priceImpactPct))?Number(q.priceImpactPct):null, route:Array.isArray(q.path)?q.path:[] })
             } else errors.push(`cookiebox: ${cb.status === 'rejected' ? cb.reason?.message || cb.reason : 'no route'}`)
             if (cs.status === 'fulfilled' && cs.value?.multiRoute) {
-              const q=cs.value.multiRoute; quotes.push({ aggregator:'cookiescan', inputMint, outputMint, inAmount:String(q.totalInAmount??amount), outAmount:String(q.totalOutAmount??'0'), minOutAmount:q.minOutAmount==null?null:String(q.minOutAmount), priceImpactPct:Number.isFinite(Number(q.combinedPriceImpactPct))?Number(q.combinedPriceImpactPct):null, route:Array.isArray(q.route)?q.route:[], raw:q })
+              const q=cs.value.multiRoute; quotes.push({ aggregator:'cookiescan', inputMint, outputMint, inAmount:String(q.totalInAmount??amount), outAmount:String(q.totalOutAmount??'0'), minOutAmount:q.minOutAmount==null?null:String(q.minOutAmount), priceImpactPct:Number.isFinite(Number(q.combinedPriceImpactPct))?Number(q.combinedPriceImpactPct):null, route:Array.isArray(q.route)?q.route:[] })
             } else errors.push(`cookiescan: ${cs.status === 'rejected' ? cs.reason?.message || cs.reason : 'no route'}`)
             quotes.sort((a,b)=>BigInt(b.outAmount)>BigInt(a.outAmount)?1:BigInt(b.outAmount)<BigInt(a.outAmount)?-1:0)
             res.statusCode=200; res.end(JSON.stringify({quotes,errors})); return
@@ -58,7 +58,7 @@ function localApi(): Plugin {
             if(aggregator==='cookiebox') {
               const built=await readJson(`${COOKIEBOX}/swap-tx`,{method:'POST',body:JSON.stringify({inputMint,outputMint,amount:String(amount),slippageBps:slip,owner})},60000)
               if(!built?.transactionBase64) throw new Error('Cookiebox returned no transaction')
-              res.statusCode=200; res.end(JSON.stringify({aggregator,transactionBase64:built.transactionBase64,blockhash:built.blockhash,lastValidBlockHeight:built.lastValidBlockHeight})); return
+              res.statusCode=200; res.end(JSON.stringify({aggregator,transactionBase64:built.transactionBase64,blockhash:built.blockhash,lastValidBlockHeight:built.lastValidBlockHeight,freshQuote:{aggregator:'cookiebox',inputMint,outputMint,inAmount:String(built.route?.inAmount??amount),outAmount:String(built.route?.netOutAmount??built.route?.outAmount??'0'),minOutAmount:built.route?.minOutAmount==null?null:String(built.route.minOutAmount),priceImpactPct:Number.isFinite(Number(built.route?.priceImpactPct))?Number(built.route.priceImpactPct):null,route:Array.isArray(built.route?.path)?built.route.path:[]}})); return
             }
             if(aggregator==='cookiescan') {
               const qs=new URLSearchParams({inputMint,outputMint,amount:String(amount),slippageBps:String(slip)})
@@ -66,7 +66,7 @@ function localApi(): Plugin {
               if(!quoted?.multiRoute) throw new Error('Candy Shop returned no fresh route')
               const built=await readJson(`${COOKIESCAN_SWAP}/swap-tx/multi-route`,{method:'POST',body:JSON.stringify({multiRoute:quoted.multiRoute,userPublicKey:owner})},20000)
               if(!built?.transactionBase64) throw new Error('Candy Shop returned no transaction')
-              res.statusCode=200; res.end(JSON.stringify({aggregator,transactionBase64:built.transactionBase64})); return
+              res.statusCode=200; res.end(JSON.stringify({aggregator,transactionBase64:built.transactionBase64,freshQuote:{aggregator:'cookiescan',inputMint,outputMint,inAmount:String(quoted.multiRoute.totalInAmount??amount),outAmount:String(quoted.multiRoute.totalOutAmount??'0'),minOutAmount:quoted.multiRoute.minOutAmount==null?null:String(quoted.multiRoute.minOutAmount),priceImpactPct:Number.isFinite(Number(quoted.multiRoute.combinedPriceImpactPct))?Number(quoted.multiRoute.combinedPriceImpactPct):null,route:Array.isArray(quoted.multiRoute.route)?quoted.multiRoute.route:[]}})); return
             }
             throw new Error('unsupported aggregator')
           }

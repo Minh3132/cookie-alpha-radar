@@ -6,11 +6,14 @@ import { WalletPanel } from './components/WalletPanel'
 import { TokenTable } from './components/TokenTable'
 import { TradeModal } from './components/TradeModal'
 import { PortfolioPanel } from './components/PortfolioPanel'
+import { ActivityPanel } from './components/ActivityPanel'
+import { JudgePanel } from './components/JudgePanel'
 import { fetchChainStatus, fetchTokens } from './lib/api'
 import { COOKIE_BRIDGE, COOKIE_EXPLORER, COOKIE_RPC, COOKIE_WS, MEMO_PROGRAM } from './lib/config'
-import type { ChainStatus, TokenRecord, WatchProof } from './lib/types'
+import type { ActivityRecord, ChainStatus, TokenRecord, WatchProof } from './lib/types'
 import { applyPriceTick } from './lib/market'
 import { DEMO_TOKENS } from './lib/demo'
+import { loadActivities, newActivityId, persistActivities } from './lib/journal'
 
 const initialStatus: ChainStatus = { online: false, cookUsd: null, activeTokens: null, slot: null, latencyMs: null, source: 'unknown' }
 
@@ -25,11 +28,16 @@ export default function App() {
   const [toast, setToast] = useState<string | null>(null)
   const [streamLive, setStreamLive] = useState(false)
   const [demoMode, setDemoMode] = useState(false)
+  const [activities, setActivities] = useState<ActivityRecord[]>(() => loadActivities())
   const [proofs, setProofs] = useState<WatchProof[]>(() => {
     try { return JSON.parse(localStorage.getItem('cookie-alpha-proofs') || '[]') as WatchProof[] } catch { return [] }
   })
   const { connection } = useConnection()
   const { publicKey, sendTransaction } = useWallet()
+
+  const addActivity = useCallback((record: ActivityRecord) => {
+    setActivities(current => { const next = [record, ...current].slice(0, 100); persistActivities(next); return next })
+  }, [])
 
   const refresh = useCallback(async () => {
     setLoading(true); setError(null)
@@ -96,12 +104,18 @@ export default function App() {
       )
       const signature = await sendTransaction(tx, connection, { skipPreflight: false, preflightCommitment: 'confirmed' })
       await connection.confirmTransaction({ signature, ...latest }, 'confirmed')
-      const proof: WatchProof = { mint: token.mint, symbol: token.symbol, score: token.score, signature, createdAt: new Date().toISOString() }
+      const createdAt = new Date().toISOString()
+      const proof: WatchProof = { mint: token.mint, symbol: token.symbol, score: token.score, signature, createdAt }
       const next = [proof, ...proofs].slice(0, 12); setProofs(next); localStorage.setItem('cookie-alpha-proofs', JSON.stringify(next))
+      addActivity({ id:newActivityId('watch'), kind:'watch', status:'confirmed', createdAt, symbol:token.symbol, mint:token.mint, signature })
       setToast(`Confirmed: ${signature.slice(0, 8)}…${signature.slice(-8)}`)
-    } catch (e) { setToast(`Transaction failed: ${e instanceof Error ? e.message : 'unknown wallet/RPC error'}`) }
+    } catch (e) {
+      const text = e instanceof Error ? e.message : 'unknown wallet/RPC error'
+      addActivity({ id:newActivityId('watch'), kind:'watch', status:'failed', createdAt:new Date().toISOString(), symbol:token.symbol, mint:token.mint, message:text })
+      setToast(`Transaction failed: ${text}`)
+    }
     finally { setBusyMint(null) }
-  }, [connection, proofs, publicKey, sendTransaction])
+  }, [addActivity, connection, proofs, publicKey, sendTransaction])
 
   const top = filtered.slice(0, 24)
   const lowRisk = tokens.filter(t => t.risk === 'LOW').length
@@ -129,6 +143,8 @@ export default function App() {
         <Metric label="RPC latency" value={status.latencyMs == null ? '—' : `${status.latencyMs}ms`} sub={COOKIE_RPC.replace('https://','')} />
       </section>
 
+      <JudgePanel status={status} streamLive={streamLive} demoMode={demoMode} tokenCount={tokens.length} proofs={proofs} activities={activities} />
+
       <section className="panel" id="radar">
         <div className="panel-head"><div><span className="kicker">ALPHA BOARD</span><h2>Live market radar</h2></div><div className="filters"><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search symbol / mint"/><button onClick={() => void refresh()}>{loading ? 'Refreshing…' : 'Refresh'}</button></div></div>
         {error && <div className="warning feed-warning"><div><b>Market feed degraded.</b> {error}. No synthetic values are substituted automatically.</div><button onClick={useDemoFixture}>Load labeled demo fixture</button></div>}
@@ -137,13 +153,15 @@ export default function App() {
 
       <PortfolioPanel />
 
+      <ActivityPanel activities={activities} />
+
       <section className="split">
         <div className="panel methodology"><span className="kicker">MODEL</span><h2>Explainable, not magic.</h2><p>Alpha rewards liquidity depth, 24h flow and turnover. Risk is scored separately from liquidity weakness, concentration proxies, missing flow and extreme volatility — momentum is never labeled safe just because it is strong.</p><div className="formula"><span>Liquidity</span><b>+</b><span>Flow</span><b>+</b><span>Turnover</span><b>−</b><span>Volatility</span></div></div>
         <div className="panel proofs"><span className="kicker">ON-CHAIN ACTIVITY</span><h2>Watch proofs</h2>{proofs.length === 0 ? <p className="muted">Connect a wallet and choose “Watch on-chain”. The app writes a small Memo transaction on Cookie Chain and records the confirmed signature here.</p> : <div className="proof-list">{proofs.map(p => <a key={p.signature} href={`${COOKIE_EXPLORER}/tx/${p.signature}`} target="_blank" rel="noreferrer"><b>{p.symbol}</b><span>score {p.score}</span><code>{p.signature.slice(0,6)}…{p.signature.slice(-6)}</code></a>)}</div>}</div>
       </section>
 
-      <footer><div><b>Cookie Alpha Radar · v0.3.0</b><span>Built natively for Cookie Chain.</span></div><div><a href="https://docs.cookiechain.wtf" target="_blank" rel="noreferrer">Docs</a><a href="https://api.cookiescan.io" target="_blank" rel="noreferrer">DAS API</a><a href="https://cookieswap.fun" target="_blank" rel="noreferrer">CookieSwap</a></div></footer>
-      {tradeToken && <TradeModal token={tradeToken} onClose={() => setTradeToken(null)} />}
+      <footer><div><b>Cookie Alpha Radar · v0.4.1</b><span>Built natively for Cookie Chain.</span></div><div><a href="https://docs.cookiechain.wtf" target="_blank" rel="noreferrer">Docs</a><a href="https://api.cookiescan.io" target="_blank" rel="noreferrer">DAS API</a><a href="https://cookieswap.fun" target="_blank" rel="noreferrer">CookieSwap</a></div></footer>
+      {tradeToken && <TradeModal token={tradeToken} onClose={() => setTradeToken(null)} onActivity={addActivity} />}
       {toast && <button className="toast" onClick={() => setToast(null)}>{toast}<span>×</span></button>}
     </main>
   )

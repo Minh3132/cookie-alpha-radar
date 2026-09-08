@@ -12,6 +12,8 @@ Cookie Alpha Radar turns Cookie Chain market data into explainable alpha + risk 
 - Low-risk on-chain UX: demonstrates meaningful transaction execution without forcing a swap.
 - Wallet intelligence: native COOK balance, CookieScan DAS holdings and recent on-chain signatures after Nightly connects.
 - Outage resilience: a clearly labeled synthetic fixture is opt-in only and cannot execute transactions.
+- Payment-grade execution checks: server-side fresh re-quote, client route identity/output/fee-payer validation, signed-tx simulation, then broadcast.
+- Evidence journal: export confirmed/failed actions as JSON or CSV for judges.
 
 ## Required links to fill before submission
 - Live app: TBD
@@ -29,8 +31,9 @@ Cookie Alpha Radar turns Cookie Chain market data into explainable alpha + risk 
 7. Approve the Memo transaction.
 8. Show confirmed signature in Activity and open it on CookieScan.
 9. Show wallet intelligence: COOK balance, DAS assets and recent Cookie Chain signatures.
-10. Open Smart Swap, compare Cookiebox vs Candy Shop, and show the build → wallet sign → simulate → broadcast status flow with a tiny test amount.
-10. Show the bridge guide for obtaining COOK.
+10. Open Smart Swap, compare Cookiebox vs Candy Shop, and show fresh re-quote → wallet sign → simulate → broadcast with a tiny test amount.
+11. Export the Activity Journal as JSON to show verifiable evidence.
+12. Show the Hyperlane bridge guide for obtaining COOK.
 
 ## X thread draft outline
 1. Hook: “Dashboards tell you what happened. Cookie Alpha Radar lets you stamp what you spotted on-chain.”
@@ -39,7 +42,7 @@ Cookie Alpha Radar turns Cookie Chain market data into explainable alpha + risk 
 4. Video/GIF: Nightly connect → watch proof → CookieScan confirmation.
 5. Tech: CookieScan APIs + Cookie Chain RPC + Wallet Standard + Memo program.
 6. Safety: no private keys, no fake fallback prices, wallet signs locally.
-7. Bridge guide: direct users to https://bridge.cookiescan.io before they need COOK for fees.
+7. Bridge guide: direct users to https://hyperlane.cookiescan.io before they need COOK for fees.
 8. Live app + repo links.
 
 ## Smart Router upgrade
@@ -47,4 +50,4 @@ The app also compares the same two Cookie Chain aggregation paths used by the of
 - Cookiebox Aggregator (`agg.cookiebox.app`)
 - Candy Shop / CookieScan Swap API (`swap.cookiescan.io/api`)
 
-Swap safety flow: quote → build unsigned v0 transaction → wallet review/sign → Cookie RPC simulation → only then broadcast and confirm.
+Swap safety flow: quote → server re-quote → validate fresh output + fee payer → wallet review/sign → Cookie RPC simulation → only then broadcast and confirm.

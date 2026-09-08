@@ -21,7 +21,7 @@ if gh repo view "$REPO" >/dev/null 2>&1; then
   git remote remove origin >/dev/null 2>&1 || true
   git remote add origin "https://github.com/$REPO.git"
   gh auth setup-git >/dev/null 2>&1 || true
-  git push -u origin main
+  git push -u origin main --force-with-lease 2>/dev/null || git push -u origin main
 else
   echo "[INFO] Creating public GitHub repository $REPO ..."
   gh repo create "$REPO" --public --source=. --remote=origin --push \

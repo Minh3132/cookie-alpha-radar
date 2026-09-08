@@ -25,6 +25,8 @@ export default async function handler(req, res) {
     const outputMint = required(req.query.outputMint, 'outputMint')
     const amount = required(req.query.amount, 'amount')
     const slippageBps = String(req.query.slippageBps || '500')
+    const slip = Number(slippageBps)
+    if (!Number.isInteger(slip) || slip < 10 || slip > 3000) throw new Error('slippageBps must be between 10 and 3000')
     const owner = typeof req.query.owner === 'string' ? req.query.owner : ''
     if (!/^\d+$/.test(amount) || BigInt(amount) <= 0n) throw new Error('amount must be a positive raw integer')
     const qs = new URLSearchParams({ inputMint, outputMint, amount, slippageBps, ...(owner ? { owner } : {}) })
@@ -44,7 +46,6 @@ export default async function handler(req, res) {
         minOutAmount: q.minOutAmount == null ? null : String(q.minOutAmount),
         priceImpactPct: n(q.priceImpactPct),
         route: Array.isArray(q.path) ? q.path : [],
-        raw: q,
       })
     } else errors.push(`cookiebox: ${cb.status === 'rejected' ? cb.reason?.message || cb.reason : 'no route'}`)
 
@@ -57,7 +58,6 @@ export default async function handler(req, res) {
         minOutAmount: q.minOutAmount == null ? null : String(q.minOutAmount),
         priceImpactPct: n(q.combinedPriceImpactPct),
         route: Array.isArray(q.route) ? q.route : [],
-        raw: q,
       })
     } else errors.push(`cookiescan: ${cs.status === 'rejected' ? cs.reason?.message || cs.reason : 'no route'}`)
 

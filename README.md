@@ -26,6 +26,8 @@ The app does **not** fabricate market values when an upstream feed is unavailabl
 - ✅ Cookiebox + Candy Shop dual-aggregator quote comparison
 - ✅ Non-custodial swap build → wallet sign → simulation → broadcast → confirm
 - ✅ CookieSwap and bridge routes
+- ✅ Evidence journal with JSON/CSV export for confirmed + failed actions
+- ✅ Judge-path readiness panel for quick bounty verification
 - ✅ Open-source, deployable web app
 
 ## Smart swap flow
@@ -37,7 +39,7 @@ The app includes a serverless quote/build proxy for the same two Cookie Chain ag
 
 Flow: **quote both → rank net output → server-side re-quote selected route → build unsigned transaction → wallet signs locally → simulate on Cookie Chain RPC → broadcast only after a clean simulation → confirm**.
 
-For Candy Shop, the build endpoint deliberately ignores any route echoed back by the browser and fetches a fresh route server-side before transaction construction.
+For Candy Shop, the build endpoint deliberately ignores any route echoed back by the browser and fetches a fresh route server-side before transaction construction. For both aggregators, the browser validates the fresh route identity, output deterioration against the chosen slippage, and the v0 transaction fee payer before wallet signing.
 
 No private key is sent to the site or serverless functions.
 
@@ -130,6 +132,10 @@ For Vercel:
 - Build command: `npm run build`
 - Output directory: `dist`
 
+## Evidence journal
+
+Every confirmed/failed Watch Proof and Smart Swap attempt is recorded locally in the browser. The journal can export JSON or CSV for the bounty submission packet. It stores transaction evidence and human-readable errors only — never wallet secrets.
+
 ## Security notes
 
 - Never asks for or stores a seed phrase/private key.
@@ -144,6 +150,7 @@ For Vercel:
 - [x] Add 5-second CookieScan WebSocket price/volume ticks with automatic reconnect; REST polling remains the fallback.
 - [x] Add Cookiebox/Candy Shop quote comparison.
 - [x] Add wallet-signed, pre-broadcast simulated swap execution.
+- [x] Add submission evidence journal + judge-path readiness panel.
 - [ ] Deploy public build.
 - [ ] Record demo and publish required X thread.
 - [ ] Share X thread in Cookie Chain Telegram.
@@ -154,7 +161,7 @@ For Vercel:
 - https://api.cookiescan.io
 - https://cookiescan.io
 - https://cookieswap.fun
-- https://bridge.cookiescan.io
+- https://hyperlane.cookiescan.io
 - https://nightly.app
 
 ---

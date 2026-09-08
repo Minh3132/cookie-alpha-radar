@@ -1,4 +1,4 @@
-import type { SwapQuote } from './types'
+import type { FreshSwapQuote, SwapQuote } from './types'
 
 export async function getSwapQuotes(args: { inputMint: string; outputMint: string; amount: string; slippageBps: number; owner?: string }) {
   const q = new URLSearchParams({ inputMint: args.inputMint, outputMint: args.outputMint, amount: args.amount, slippageBps: String(args.slippageBps), ...(args.owner ? { owner: args.owner } : {}) })
@@ -17,7 +17,7 @@ export async function buildSwapTransaction(args: { quote: SwapQuote; owner: stri
     slippageBps: args.slippageBps,
     owner: args.owner,
   }) })
-  const body = await r.json() as { transactionBase64?: string; blockhash?: string; lastValidBlockHeight?: number; error?: string }
-  if (!r.ok || !body.transactionBase64) throw new Error(body.error || `swap build ${r.status}`)
+  const body = await r.json() as { transactionBase64?: string; blockhash?: string; lastValidBlockHeight?: number; freshQuote?: FreshSwapQuote; error?: string }
+  if (!r.ok || !body.transactionBase64 || !body.freshQuote) throw new Error(body.error || `swap build ${r.status}`)
   return body
 }

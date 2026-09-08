@@ -42,5 +42,20 @@ export type SwapQuote = {
   minOutAmount: string | null
   priceImpactPct: number | null
   route: string[]
-  raw: unknown
+}
+
+export type FreshSwapQuote = SwapQuote
+
+export type ActivityRecord = {
+  id: string
+  kind: 'watch' | 'swap'
+  status: 'confirmed' | 'failed'
+  createdAt: string
+  symbol: string
+  mint: string
+  aggregator?: 'cookiebox' | 'cookiescan'
+  inputAmountCook?: string
+  expectedOut?: string
+  signature?: string
+  message?: string
 }
