@@ -6,6 +6,7 @@ The execution path is non-custodial: the app performs a server-side fresh re-quo
 
 GitHub: https://github.com/Minh3132/cookie-alpha-radar
 Live app: https://cookie-alpha-radar-chukhacminh24369-6507.vercel.app
+X demo thread: https://x.com/RiznawatiMufli/status/2097156751070257419?s=20
 Optional Watch Proof program: MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr
 
 Highlights:
